@@ -1,27 +1,18 @@
 <script>
-  import { createEventDispatcher } from "svelte";
-
   export let todoText;
-
-  const dispatch = createEventDispatcher();
-
-  function handleInputChange(e) {
-    console.log("event", e.target.value);
-    dispatch("handleTodoTextChange", {
-      text: e.target.value,
-    });
-  }
+  export let handleTodolistAdd;
+  export let handleTodoTextChange;
 </script>
 
-<div class="input">
+<form class="input" on:submit|preventDefault={handleTodolistAdd}>
   <input
     class="input__textInput"
     type="text"
     value={todoText}
-    on:change={handleInputChange}
+    on:change={handleTodoTextChange}
   />
-  <button class="input__submitBtn">작성</button>
-</div>
+  <button class="input__submitBtn" on:onclick={handleTodolistAdd}>작성</button>
+</form>
 
 <style>
   .input {
