@@ -9,10 +9,12 @@
     width: 100%;
     display: flex;
     justify-content: center;
+    background-color: #eaecef;
   }
 
   .layout__inner {
-    width: 650px;
+    width: 550px;
     height: 100vh;
+    background-color: #ffffff;
   }
 </style>

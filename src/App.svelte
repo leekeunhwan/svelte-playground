@@ -1,11 +1,11 @@
 <script>
   import Layout from "./Layout.svelte";
-  
+  import TodoPage from "./pages/TodoPage.svelte";
 </script>
 
 <main>
   <Layout>
-    <div>asdf</div>
+    <TodoPage />
   </Layout>
 </main>
 
