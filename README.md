@@ -657,7 +657,506 @@ of {join(flavours)}
 </style>
 ```
 
+그 외 this, dimension (clientWidth, offsetHeight등...), media등...<br/>
+bind처리를 통해서 값을 연결해줄 수 있습니다.<br/>
+
 <br/>
+
+`LifeCycle - onMount`
+
+컴포넌트가 DOM에 처음 렌더링 된 후에 실행됩니다.<br/>
+네트워크를 통해 데이터를 가져와 느리게 데이터가 세팅이 된다면,<br/>
+`<script>` 태그의 상단이 아닌 onMount 라이프 사이클 함수에서 가져오는 것이 좋습니다.<br/>
+서버 사이드 랜더링(Server Side Rendering) 중에는,<br/>
+onDestroy 라이프 사이클 함수를 제외한 다른 라이프 사이클 함수들은 실행되지 않습니다.<br/>
+서버 사이드 랜더링되는 동안에 onMount 라이프 사이클 함수가 실행되지 않기 때문에,<br/>
+마운트 된 후에 실행되는 onMount에서 데이터를 가져오면,<br/>
+데이터를 가져오느라 DOM이 느리게 마운트 되는 문제를 피할 수 있습니다.<br/>
+또한 return을 통해서 destroy(= unmount)되는 시점에 이벤트를 호출할 수 있습니다.<br/>
+
+```js
+onMount(async () => {
+  const res = await fetch(
+    `https://jsonplaceholder.typicode.com/photos?_limit=20`
+  );
+  photos = await res.json();
+});
+
+onMount(async () => {
+  window.addEventListener("resize", handleScreenResize);
+
+  return () => {
+    widnow.removeEventListener("resize", handleScreenResize);
+  };
+});
+```
+
+<br/>
+
+`LifeCycle - onDestroyed`
+
+컴포넌트에 할당된 자원이 해제될 때 호출되는 라이프 사이클입니다.<br/>
+컴포넌트에 트리거된 이벤트리스너를 해제하지 않으면 메모리 누수가 발생할 수 있는데<br/>
+onDestoryed를 이용하여, 해제해주면 메모리 누수가 방지됩니다.<br/>
+JSX, TSX, Hooks에서만 라이프 사이클을 사용해야하는 리액트와 달리<br/>
+스벨트는 함수에서도 라이프 사이클을 사용하여 추상화가 가능합니다.<br/>
+
+```js
+onInterval(() => (seconds += 1), 1000);
+```
+
+<br/>
+
+`LifeCycle - beforeUpdate, afterUpdate는`
+
+beforeUpdate는 DOM이 업데이트되기 직전에 실행하도록 합니다.<br/>
+afterUpdate는 DOM이 데이터와 동기화되면 실행하도록 합니다.<br/>
+
+함께 사용하면 요소의 스크롤 위치를 업데이트하는 것과 같이<br/>
+순전히 상태 기반 방식으로 달성하기 어려운 작업을 명령적으로 수행하는 데 유용합니다.<br/>
+
+beforeUpdate는 컴포넌트가 마운트되기 전에 먼저 실행되므로<br/>
+해당 속성을 읽기 전에 속성이 바인드 된 태그가 있는지 확인해야합니다.<br/>
+
+```js
+// 리액트의 getSnapshotBeforeUpdate이랑 비슷한 느낌입니다.
+beforeUpdate(() => {
+  autoscroll = div && div.offsetHeight + div.scrollTop > div.scrollHeight - 20;
+});
+
+// 리액트의 componentDidUpdate랑 비슷한 느낌입니다.
+afterUpdate(() => {
+  if (autoscroll) div.scrollTo(0, div.scrollHeight);
+});
+```
+
+<br/>
+
+`LifeCycle - Tick`
+
+tick은 다른 라이프 사이클 함수들과 다르게 정해진 시점에만 호출되는 것이 아닌 언제든 사용할 수 있습니다.<br/>
+(사실 라이프 사이클이라고 보기에는 조금 성격이 달라서 그냥 함수로 불리기도 합니다.)<br/>
+tick 함수는 변경된 내용이 있다면 변경된 내용이 DOM에 반영된 직후에, 변경된 내용이 없다면 바로 호출됩니다.<br/>
+
+Svelte는 상태가 변경되면 바로 업데이트 하기보다는 정해진 시간동안에 변경된 내용을 벌크업데이트하는데,<br/>
+이런 동작은 브라우저가 효율적으로 일괄 처리 할 수 있도록 도와줍니다.<br/>
+
+await tick을 쓰면 라이프 사이클 함수의 상태와는 별개로 모든 돔의 렌더링을 기다리고 그후에 작업을 할 수 있도록 해줍니다.<br/>
+
+```js
+onMount(async () => {
+  console.log("child onMount");
+});
+
+onDestroy(async () => {
+  console.log("child onDestroy");
+});
+
+beforeUpdate(async () => {
+  console.log("the component is about to update");
+  await tick();
+  console.log("the component just updated");
+});
+
+afterUpdate(async () => {
+  console.log("child afterUpdate");
+});
+
+// await tick이 없을 때
+// App beforeUpdate
+// TodoList.svelte:21 the component is about to update
+// TodoList.svelte:23 the component just updated
+// TodoList.svelte:12 TodoLists onMount
+// TodoList.svelte:27 TodoLists afterUpdate
+// App.svelte:103 App onMount
+// App.svelte:115 App afterUpdate
+
+// await tick이 있을 때
+// App beforeUpdate
+// TodoList.svelte:21 the component is about to update
+// TodoList.svelte:12 TodoLists onMount
+// TodoList.svelte:27 TodoLists afterUpdate
+// App.svelte:103 App onMount
+// App.svelte:115 App afterUpdate
+// TodoList.svelte:23 the component just updated
+```
+
+<br/>
+
+`Store - writable`
+
+상태값을 내려주고 받는 것을 Props와 State Lifting과 같은 방법으로<br/>
+해결할 수 있지만, 범위가 많고 넓다면 어려울 수 있습니다.<br/>
+그런 경우 store를 사용합니다.<br/>
+
+writable은 수정이 가능한 store를 만들기 위해 사용합니다.<br/>
+
+```js
+// stores.js
+export const count = writable(0);
+
+// Incrementer.svelte
+function increment() {
+  count.update((n) => n + 1);
+}
+
+// Decrementer.svelte
+function decrement() {
+  count.update((n) => n - 1);
+}
+
+// Resetter.svelte
+function reset() {
+  count.set(0);
+}
+
+// App.svelte
+// 구독
+const unsubscribe = count.subscribe((value) => {
+  count_value = value;
+});
+
+// 구독 자원해제
+onDestroyed(unsubscribe);
+
+// 이것을 좀 더 편하게 하려면 자동구독!
+// $를 붙이면 subscribe와 onDestroyed를 자동으로 해줍니다.
+
+<h1>The count is {$count}</h1>;
+```
+
+<br/>
+
+`Store - Readable`
+
+readable은 수정이 불가능한 store를 만들기 위해 사용됩니다.<br/>
+
+```js
+// initial : 초기값, 필요가 없다면 null이나 undefined 사용
+// start : 첫 구독자가 발생했을 때 호출되는 함수
+// set : 관찰하고 있는 값을 변경하는 콜백 함수
+// stop : 모든 구독자가 구독을 중단하면 호출되는 함수 -> start에서 사용한 자원이 있으면 여기에서 해제를 해야합니다.
+readable(initial, function start (set) {
+  ...
+  return function stop () {
+    ...
+  };
+})
+```
+
+<br/>
+
+`Store - Derived stores`
+
+derived를 사용하면, 존재하는 store를 이용하여 새로운 store을 만들어 낼 수 있습니다.<br/>
+Vuex의 Getter와 비슷한 느낌입니다. (=> store의 state에 직접 연산하지 않고, 계산된 결과를 가져다 쓸 수 있습니다.)<br/>
+
+```js
+store = derived([a, ...b], callback: ([a: any, ...b: any[]], set: (value: any) => void) => void | () => void, initial_value: any)
+
+// 첫 번째 파라미터는 참고하는 store => 하나일 때는 그냥 객체, 두개이상이면 배열
+// 두 번째 파라미터는 새로운 store의 값을 리턴하는 콜백 함수, 콜백 함수의 파라미터는 참고하는 store, 콜백함수의 마지막 파라미터는 set 함수
+// 세 번째 파라미터는 새로운 store의 초깃값입니다.
+```
+
+<br/>
+
+`Store - Custom stores`
+
+다음과 같이 만들면 됩니다.
+
+```js
+import { writable } from "svelte/store";
+
+function createCount() {
+  const { subscribe, set, update } = writable(0);
+
+  return {
+    subscribe,
+    increment: () => update((n) => n + 1),
+    decrement: () => update((n) => n - 1),
+    reset: () => set(0),
+  };
+}
+
+export const count = createCount();
+```
+
+<br/>
+
+`Store - Store Binding`
+
+store도 바인딩이 가능합니다.<br/>
+바인딩이 가능하려면 writable store 이어야 합니다(set 함수가 존재해야 합니다)<br/>
+
+```js
+// in stores.js
+import { writable, derived } from "svelte/store";
+
+export const name = writable("world");
+
+export const greeting = derived(name, ($name) => `Hello ${$name}!`);
+```
+
+```js
+// app.svelte
+<script>
+  import { name, greeting } from './stores.js';
+</script>
+
+// 자동구독 사용
+<h1>{$greeting}</h1>
+<input bind:value={$name}>
+
+<button on:click="{() => $name += '!'}">
+  Add exclamation mark!
+</button>
+```
+
+<br/>
+
+`class`
+
+`class:`을 통해서 조건에 알맞게 클래스네임을 추가하는 것을 사용할 수 있습니다.<br/>
+
+```js
+<button class:selected="{current === 'foo'}" on:click="{() => current = 'foo'}">
+  foo
+</button>
+
+// 혹은 shortHand를 쓰면
+// big이 true일 때 big이란 클래스가 추가된다.
+<div class:big>
+	{big ? 'big' : 'small'}
+</div>
+```
+
+<br/>
+
+`slot`
+
+vue의 slot, react의 children과 유사합니다.<br/>
+어느 엘리먼트든 slot을 대체할 수 있고,<br/>
+slot에 자식을 넣어두면, slot을 대체할 엘리먼트가 없을 경우<br/>
+default값으로 보여지게 됩니다.<br/>
+
+```js
+// Layout.svelte
+<div class="layout__outer">
+  <div class="layout__inner">
+    <slot />
+  </div>
+</div>
+
+
+// App.svelte
+<main>
+  <Layout>
+    <TodoPage />
+  </Layout>
+</main>
+```
+
+<br/>
+
+`named slot`
+
+slot에 name을 설정해두면,<br/>
+무작정 children만 렌더하는 것이 아니라<br/>
+지정된 name에 알맞게 slot안으로 엘리먼트가 들어갈 수 있도록 처리합니다.<br/>
+
+```js
+// App.svelte
+<script>
+	import ContactCard from './ContactCard.svelte';
+</script>
+
+<ContactCard>
+	<span slot="name">
+		P. Sherman
+	</span>
+
+	<span slot="address">
+		42 Wallaby Way<br>
+		Sydney
+	</span>
+</ContactCard>
+
+
+// ContactCard.svelte
+<style>
+	.contact-card {
+		width: 300px;
+		border: 1px solid #aaa;
+		border-radius: 2px;
+		box-shadow: 2px 2px 8px rgba(0,0,0,0.1);
+		padding: 1em;
+	}
+
+	h2 {
+		padding: 0 0 0.2em 0;
+		margin: 0 0 1em 0;
+		border-bottom: 1px solid #ff3e00
+	}
+
+	.address, .email {
+		padding: 0 0 0 1.5em;
+		background:  0 0 no-repeat;
+		background-size: 20px 20px;
+		margin: 0 0 0.5em 0;
+		line-height: 1.2;
+	}
+
+	.address { background-image: url(tutorial/icons/map-marker.svg) }
+	.email   { background-image: url(tutorial/icons/email.svg) }
+	.missing { color: #999 }
+</style>
+
+<article class="contact-card">
+	<h2>
+		<slot name="name">
+			<span class="missing">Unknown name</span>
+		</slot>
+	</h2>
+
+	<div class="address">
+		<slot name="address">
+			<span class="missing">Unknown address</span>
+		</slot>
+	</div>
+
+	<div class="email">
+		<slot name="email">
+			<span class="missing">Unknown email</span>
+		</slot>
+	</div>
+</article>
+```
+
+<br/>
+
+`slot content checking`
+
+slot에 데이터가 있을 때만 컨디셔널하게 렌더링이 가능합니다.<br/>
+
+```js
+<article class:has-discussion={$$slots.comments}>
+
+{#if $$slots.comments}
+	<div class="discussion">
+		<h3>Comments</h3>
+		<slot name="comments"></slot>
+	</div>
+{/if}
+```
+
+<br/>
+
+`slot props`
+
+slot에도 props를 넣어줄수 있습니다.
+
+```js
+// in Hoverable.svelte
+<script>
+	let hovering;
+
+	function enter() {
+		hovering = true;
+	}
+
+	function leave() {
+		hovering = false;
+	}
+</script>
+
+<div on:mouseenter={enter} on:mouseleave={leave}>
+	<slot hovering={hovering}></slot>
+</div>
+
+// in App.svelte
+<Hoverable let:hovering={active}>
+	<div class:active>
+		{#if active}
+			<p>I am being hovered upon.</p>
+		{:else}
+			<p>Hover over me!</p>
+		{/if}
+	</div>
+</Hoverable>
+```
+
+<br/>
+
+`context`
+
+store과 굉장히 유사하지만 store는 전체에 영향을 주는 반면<br/>
+context는 하위에만 영향을 줍니다.<br/>
+하위의 요소에서만 영향을 주고 받으면 되는 경우 context가 유용할 수 있습니다.<br/>
+
+```js
+// context set
+setContext(key, {
+  getMap: () => map,
+});
+
+// context get
+const { getMap } = getContext(key);
+const map = getMap();
+```
+
+<br/>
+
+`<svelte:self>`
+
+svelte:self는 컴포넌트가 자신을 재귀 적으로 포함할 수 있도록 합니다.<br/>
+폴더가 다른 폴더를 포함 할수 있는 폴더 구조 보기와 같은 경우에 유용합니다.<br/>
+
+```js
+{#each files as file (file.id)}
+	<li>
+		{#if file.type === 'folder'}
+			<svelte:self {...file}/>
+		{:else}
+			<File {...file}/>
+		{/if}
+	</li>
+{/each}
+```
+
+<br/>
+
+`<svelte:component>`
+
+다이나믹 컴포넌트를 지원해줍니다.<br/>
+
+```js
+<script>
+	import RedThing from './RedThing.svelte';
+	import GreenThing from './GreenThing.svelte';
+	import BlueThing from './BlueThing.svelte';
+
+	const options = [
+		{ color: 'red',   component: RedThing   },
+		{ color: 'green', component: GreenThing },
+		{ color: 'blue',  component: BlueThing  },
+	];
+
+	let selected = options[0];
+</script>
+
+// 이런 복잡한 로직이
+{#if selected.color === 'red'}
+	<RedThing/>
+{:else if selected.color === 'green'}
+	<GreenThing/>
+{:else if selected.color === 'blue'}
+	<BlueThing/>
+{/if}
+
+// 이렇게 간편하게..
+<svelte:component this={selected.component}/>
+```
 
 ## 스벨트에 대한 생각
 
@@ -677,3 +1176,7 @@ React에서 JSX, CSS-IN-JS와 같이 경계가 모호해지는 것을 방지해�
 이는 잘못된 생각인 것 같다. 상당히 잘 짜여져 있고,
 충분히 어플리케이션에 무리가 없는 툴인 것 같다.
 ```
+
+## 공부하면서 참고한 블로그
+
+> https://beomy.github.io/tech/svelte/lifecycle/
