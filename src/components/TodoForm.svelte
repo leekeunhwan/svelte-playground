@@ -18,12 +18,27 @@
     };
 
     todolist = [...todolist, newTodo];
+    handleTodoInputClear();
+  }
+
+  function handleTodoInputClear() {
+    todoText = "";
+  }
+
+  function handleTodoDoneUpdate(id) {
+    const targetIndex = todolist.findIndex((list) => list.id === id);
+    todolist[targetIndex].done = !todolist[targetIndex].done;
+  }
+
+  function handleTodoDelete(id) {
+    const updatedTodolist = todolist.filter((list) => list.id !== id);
+    todolist = updatedTodolist;
   }
 </script>
 
 <div class="form__container">
   <TodoInput {handleTodolistAdd} {handleTodoTextChange} {todoText} />
-  <TodoList {todolist} />
+  <TodoList {todolist} {handleTodoDoneUpdate} {handleTodoDelete} />
 </div>
 
 <style>

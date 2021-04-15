@@ -11,5 +11,6 @@
 <style>
   .page__container {
     background: linear-gradient(180deg, #3dc5ae, #25b1a4);
+    min-height: 100vh;
   }
 </style>
